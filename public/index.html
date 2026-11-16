@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Digital Product AI</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #ffffff; --text: #1c1b18; --muted: #6b6860;
+    --line: #e2dfd6; --accent: #1f6f5c; --accent-text: #ffffff; --user: #e9f1ee; --error: #a3341f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151614; --panel: #1e201d; --text: #ecebe6; --muted: #9c9a92;
+      --line: #32352f; --accent: #4fb399; --accent-text: #0e1512; --user: #24302c; --error: #f08a73;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 650; }
+  header button {
+    background: none; border: 1px solid var(--line); color: var(--text);
+    border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 14px; cursor: pointer;
+  }
+  main { flex: 1; overflow-y: auto; padding: 16px; }
+  .col { max-width: 760px; margin: 0 auto; }
+  .intro h2 { font-size: 26px; line-height: 1.2; margin: 8vh 0 8px; }
+  .intro p { color: var(--muted); margin: 0 0 20px; }
+  .starters { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .starters button {
+    text-align: left; background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px 14px; font: inherit; font-size: 15px; cursor: pointer;
+  }
+  .starters button:hover { border-color: var(--accent); }
+  .msg { margin: 0 0 18px; overflow-wrap: anywhere; }
+  .msg.user {
+    background: var(--user); border-radius: 14px; padding: 10px 14px;
+    margin-left: auto; width: fit-content; max-width: 85%; white-space: pre-wrap;
+  }
+  .msg.assistant > :first-child { margin-top: 0; }
+  .msg.assistant > :last-child { margin-bottom: 0; }
+  .msg.assistant.plain { white-space: pre-wrap; }
+  .msg h1, .msg h2, .msg h3 { line-height: 1.25; margin: 1.2em 0 .4em; }
+  .msg h1 { font-size: 1.35em; } .msg h2 { font-size: 1.2em; } .msg h3 { font-size: 1.05em; }
+  .msg pre {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px; overflow-x: auto; white-space: pre-wrap;
+  }
+  .msg code { font-size: .92em; }
+  .msg blockquote { margin: 1em 0; padding-left: 14px; border-left: 3px solid var(--line); color: var(--muted); }
+  .msg .table { overflow-x: auto; }
+  .msg table { border-collapse: collapse; font-size: .95em; }
+  .msg th, .msg td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+  .msg a { color: var(--accent); }
+  .status { color: var(--muted); font-size: 14px; margin: 0 0 18px; }
+  .error { color: var(--error); font-size: 14px; margin: 0 0 18px; }
+  form { border-top: 1px solid var(--line); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+  .composer {
+    max-width: 760px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 8px;
+  }
+  .composer:focus-within { border-color: var(--accent); }
+  textarea {
+    flex: 1; resize: none; border: 0; outline: 0; background: none; color: var(--text);
+    font: inherit; padding: 6px 8px; max-height: 200px;
+  }
+  .composer button {
+    background: var(--accent); color: var(--accent-text); border: 0; border-radius: 10px;
+    padding: 8px 16px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .composer button:disabled { opacity: .5; cursor: default; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Digital Product AI</h1>
+  <button id="new" type="button">New chat</button>
+</header>
+<main id="scroll"><div class="col" id="log"></div></main>
+<form id="form">
+  <div class="composer">
+    <textarea id="input" rows="1" placeholder="Describe your idea, product, or problem" aria-label="Message"></textarea>
+    <button id="send" type="submit">Send</button>
+  </div>
+</form>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script>
+const STARTERS = [
+  "I have no idea what to sell. Here's my background: ",
+  "Tell me honestly whether this product idea can work: ",
+  "Write the full sales page for my product: ",
+  "Plan a 14-day launch for a product with no audience: ",
+  "My product gets traffic but no sales. Here are my numbers: ",
+  "What should I charge, and where should I sell it? The product is: ",
+];
+const STORE = "dpai.chat";
+const log = document.getElementById("log");
+const scroller = document.getElementById("scroll");
+const form = document.getElementById("form");
+const input = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+
+let messages = [];
+let busy = false;
+let controller = null;
+
+function store(key, value) {
+  try {
+    if (value === undefined) return localStorage.getItem(key);
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {}
+  return null;
+}
+try { messages = JSON.parse(store(STORE) || "[]"); } catch { messages = []; }
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function renderAssistant(node, text) {
+  if (window.marked && window.DOMPurify) {
+    node.innerHTML = DOMPurify.sanitize(marked.parse(text, { gfm: true, breaks: true }));
+    node.querySelectorAll("table").forEach((t) => {
+      const wrap = el("div", "table");
+      t.replaceWith(wrap);
+      wrap.append(t);
+    });
+    node.querySelectorAll("a").forEach((a) => { a.target = "_blank"; a.rel = "noopener noreferrer"; });
+  } else {
+    node.classList.add("plain");
+    node.textContent = text;
+  }
+}
+
+function addMessage(role, text) {
+  const node = el("div", "msg " + role);
+  if (role === "user") node.textContent = text;
+  else renderAssistant(node, text);
+  log.append(node);
+  return node;
+}
+
+function nearBottom() {
+  return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 120;
+}
+function toBottom() { scroller.scrollTop = scroller.scrollHeight; }
+
+function renderAll() {
+  log.replaceChildren();
+  if (messages.length === 0) {
+    const intro = el("div", "intro");
+    intro.append(
+      el("h2", "", "Build a digital product that sells."),
+      el("p", "", "Idea validation, pricing, sales pages, email sequences, launch plans. Pick a starting point or type your own."),
+    );
+    const grid = el("div", "starters");
+    for (const s of STARTERS) {
+      const b = el("button", "", s.trim());
+      b.type = "button";
+      b.onclick = () => { input.value = s; resize(); input.focus(); };
+      grid.append(b);
+    }
+    intro.append(grid);
+    log.append(intro);
+    return;
+  }
+  for (const m of messages) addMessage(m.role, m.content);
+  toBottom();
+}
+
+function resize() {
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 200) + "px";
+}
+
+function setBusy(value) {
+  busy = value;
+  sendBtn.textContent = value ? "Stop" : "Send";
+}
+
+async function send(text) {
+  if (messages.length === 0) log.replaceChildren();
+  messages.push({ role: "user", content: text });
+  addMessage("user", text);
+  const status = el("div", "status", "Thinking…");
+  log.append(status);
+  toBottom();
+  setBusy(true);
+  controller = new AbortController();
+
+  let reply = "";
+  let node = null;
+  let failure = "";
+  try {
+    let response;
+    for (;;) {
+      response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-access-code": store("dpai.code") || "" },
+        body: JSON.stringify({ messages }),
+        signal: controller.signal,
+      });
+      if (response.status !== 401) break;
+      const code = prompt("Enter the access code for this app:");
+      if (!code) throw new Error("Access code required.");
+      store("dpai.code", code);
+    }
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || "Request failed (" + response.status + ").");
+    }
+
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = "";
+    let pending = false;
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      const lines = buffer.split("\n");
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line) continue;
+        const event = JSON.parse(line);
+        if (event.type === "text") {
+          reply += event.text;
+          status.textContent = "";
+          if (!node) { node = el("div", "msg assistant"); status.before(node); }
+          if (!pending) {
+            pending = true;
+            requestAnimationFrame(() => {
+              pending = false;
+              const stick = nearBottom();
+              renderAssistant(node, reply);
+              if (stick) toBottom();
+            });
+          }
+        } else if (event.type === "status") {
+          status.textContent = event.text;
+        } else if (event.type === "error") {
+          failure = event.message;
+        }
+      }
+    }
+  } catch (err) {
+    if (err.name !== "AbortError") failure = err.message || "Something went wrong.";
+  }
+
+  status.remove();
+  if (node) renderAssistant(node, reply);
+  if (reply) messages.push({ role: "assistant", content: reply });
+  else messages.pop();
+  if (failure) log.append(el("div", "error", failure));
+  if (!reply && !failure) log.lastElementChild?.remove();
+  if (!reply) { input.value = text; resize(); }
+  store(STORE, JSON.stringify(messages));
+  setBusy(false);
+  controller = null;
+  if (messages.length === 0 && !failure) renderAll();
+}
+
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (busy) { controller?.abort(); return; }
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  resize();
+  send(text);
+});
+input.addEventListener("input", resize);
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
+});
+document.getElementById("new").onclick = () => {
+  controller?.abort();
+  messages = [];
+  store(STORE, null);
+  renderAll();
+  input.focus();
+};
+
+renderAll();
+</script>
+</body>
+</html>

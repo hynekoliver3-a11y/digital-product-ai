@@ -1,0 +1,16 @@
+{
+  "name": "digital-product-ai",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AI strategist for creating and marketing digital products",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js"
+  },
+  "engines": {
+    "node": ">=22.9"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.9.0"
+  }
+}
